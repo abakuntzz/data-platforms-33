@@ -1,0 +1,10 @@
+<configuration>
+  <property><name>dfs.replication</name><value>3</value></property>
+  <property><name>dfs.namenode.rpc-address</name><value>10.33.0.11:9000</value></property>
+  <property><name>dfs.namenode.rpc-bind-host</name><value>0.0.0.0</value></property>
+  <property><name>dfs.namenode.http-address</name><value>0.0.0.0:9870</value></property>
+  <property><name>dfs.namenode.secondary.http-address</name><value>10.33.0.11:9868</value></property>
+  <property><name>dfs.namenode.name.dir</name><value>file:///home/hadoop/hdfs-hw01/name</value></property>
+  <property><name>dfs.datanode.data.dir</name><value>file:///home/hadoop/hdfs-hw01/data</value></property>
+  <property><name>dfs.namenode.checkpoint.dir</name><value>file:///home/hadoop/hdfs-hw01/checkpoint</value></property>
+</configuration>

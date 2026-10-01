@@ -1,0 +1,279 @@
+# Ручная инструкция: выполнять по шагам, не запускать этот файл целиком как скрипт.
+# Исходные данные: уже есть доступ пользователя team к ВМ команды.
+# Схема преподавателя: edge (team-33-en) — вход и подготовка файлов;
+# team-33-nn — NameNode, SecondaryNameNode и DataNode; team-33-00 и team-33-01 — ещё две DataNode.
+# Для обычного перезапуска не повторять установку и форматирование; команды указаны отдельно ниже.
+
+# 1. Подготовка пользователя hadoop на четырёх ВМ.
+# Первая команда выполняется на локальном компьютере из любого каталога.
+ssh team@171.22.75.75 # перейти на edge (team-33-en), team; /home/team
+sudo apt update # обновить список доступных пакетов
+sudo apt upgrade # обновить установленные пакеты
+sudo adduser hadoop # создать пользователя
+# Ввести пароль при запросе adduser
+# Остальные поля оставить пустыми
+sudo -i -u hadoop # перейти к edge (team-33-en), hadoop; /home/hadoop
+mkdir .ssh
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-nn # перейти на NameNode (team-33-nn), team; /home/team
+sudo apt update
+sudo apt upgrade
+sudo adduser hadoop
+sudo -i -u hadoop # перейти к NameNode (team-33-nn), hadoop; /home/hadoop
+mkdir .ssh
+exit # вернуться на NameNode (team-33-nn), team; /home/team
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-00 # перейти на DataNode (team-33-00), team; /home/team
+sudo apt update
+sudo apt upgrade
+sudo adduser hadoop
+sudo -i -u hadoop # перейти к DataNode (team-33-00), hadoop; /home/hadoop
+mkdir .ssh
+exit # вернуться на DataNode (team-33-00), team; /home/team
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-01 # перейти на DataNode (team-33-01), team; /home/team
+sudo apt update
+sudo apt upgrade
+sudo adduser hadoop
+sudo -i -u hadoop # перейти к DataNode (team-33-01), hadoop; /home/hadoop
+mkdir .ssh
+exit # вернуться на DataNode (team-33-01), team; /home/team
+exit # вернуться на edge (team-33-en), team; /home/team
+
+# 2. SSH-ключи пользователей hadoop на edge и NameNode.
+sudo -i -u hadoop # перейти к edge (team-33-en), hadoop; /home/hadoop
+ssh-keygen
+cat .ssh/id_ed25519.pub >> .ssh/authorized_keys
+exit # вернуться на edge (team-33-en), team; /home/team
+mkdir -p hadoop_ssh/.ssh
+sudo cp /home/hadoop/.ssh/authorized_keys hadoop_ssh/.ssh
+sudo chown team:team hadoop_ssh/.ssh/authorized_keys
+scp -i .ssh/team_internal -r hadoop_ssh/.ssh/authorized_keys team@team-33-nn:/home/team/
+scp -i .ssh/team_internal -r hadoop_ssh/.ssh/authorized_keys team@team-33-00:/home/team/
+scp -i .ssh/team_internal -r hadoop_ssh/.ssh/authorized_keys team@team-33-01:/home/team/
+ssh -i .ssh/team_internal team@team-33-nn # перейти на NameNode (team-33-nn), team; /home/team
+sudo mv authorized_keys /home/hadoop/.ssh
+sudo chown hadoop:hadoop /home/hadoop/.ssh/authorized_keys
+# На NameNode подготовить отдельный ключ пользователя hadoop.
+sudo -i -u hadoop # перейти к NameNode (team-33-nn), hadoop; /home/hadoop
+mkdir -p .ssh
+chmod 700 .ssh
+# Не перезаписывать существующие файлы ключа.
+if [ ! -e .ssh/id_ed25519 ] && [ ! -e .ssh/id_ed25519.pub ]; then
+    ssh-keygen -t ed25519 -f .ssh/id_ed25519 -N ''
+fi
+exit # вернуться на NameNode (team-33-nn), team; /home/team
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-00 # перейти на DataNode (team-33-00), team; /home/team
+sudo mv authorized_keys /home/hadoop/.ssh
+sudo chown hadoop:hadoop /home/hadoop/.ssh/authorized_keys
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-01 # перейти на DataNode (team-33-01), team; /home/team
+sudo mv authorized_keys /home/hadoop/.ssh
+sudo chown hadoop:hadoop /home/hadoop/.ssh/authorized_keys
+exit # вернуться на edge (team-33-en), team; /home/team
+sudo -i -u hadoop # перейти к edge (team-33-en), hadoop; /home/hadoop
+# На edge под hadoop получить только публичный ключ NameNode; приватный остаётся на NameNode.
+# При ошибке любой команды этого блока остановиться и сначала устранить её.
+# При первом подключении сверить отпечаток узла с преподавателем или через доверенный доступ team.
+# После сверки подтвердить его; проверку ключей узлов не отключать.
+ssh hadoop@team-33-nn 'cat ~/.ssh/id_ed25519.pub' > .ssh/namenode_ed25519.pub
+# Добавить ключ на три узла, сохранив уже записанные ключи (используется >>).
+ssh hadoop@team-33-nn 'chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys' < .ssh/namenode_ed25519.pub
+ssh hadoop@team-33-00 'chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys' < .ssh/namenode_ed25519.pub
+ssh hadoop@team-33-01 'chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys' < .ssh/namenode_ed25519.pub
+
+# Войти на NameNode под hadoop и проверить подключения именно с него.
+ssh hadoop@team-33-nn # перейти на NameNode (team-33-nn), hadoop; /home/hadoop
+# Разрешена только авторизация по ключу, без перехода к паролю пользователя.
+ssh -o PreferredAuthentications=publickey -o ConnectTimeout=10 hadoop@team-33-nn 'hostname && whoami'
+ssh -o PreferredAuthentications=publickey -o ConnectTimeout=10 hadoop@team-33-00 'hostname && whoami'
+ssh -o PreferredAuthentications=publickey -o ConnectTimeout=10 hadoop@team-33-01 'hostname && whoami'
+# Ожидаются соответственно team-33-nn, team-33-00, team-33-01 и пользователь hadoop.
+# Все три подключения должны пройти без запроса пароля или парольной фразы ключа.
+# При ошибке не переходить к следующим шагам развёртывания.
+exit # вернуться на edge (team-33-en), hadoop; /home/hadoop
+
+
+# 3. Распространение и распаковка Hadoop; начало на edge под hadoop.
+scp hadoop-3.4.0.tar.gz team-33-nn:/home/hadoop
+scp hadoop-3.4.0.tar.gz team-33-00:/home/hadoop
+scp hadoop-3.4.0.tar.gz team-33-01:/home/hadoop
+tar -xzf hadoop-3.4.0.tar.gz
+ssh hadoop@team-33-nn # перейти на NameNode (team-33-nn), hadoop; /home/hadoop
+tar -xzf hadoop-3.4.0.tar.gz
+exit # вернуться на edge (team-33-en), hadoop; /home/hadoop
+ssh hadoop@team-33-00 # перейти на DataNode (team-33-00), hadoop; /home/hadoop
+tar -xzf hadoop-3.4.0.tar.gz
+exit # вернуться на edge (team-33-en), hadoop; /home/hadoop
+ssh hadoop@team-33-01 # перейти на DataNode (team-33-01), hadoop; /home/hadoop
+tar -xzf hadoop-3.4.0.tar.gz
+exit # вернуться на edge (team-33-en), hadoop; /home/hadoop
+exit # вернуться на edge (team-33-en), team; /home/team
+
+# 4. Установка Java; начало на edge под team.
+sudo apt install openjdk-11-jdk-headless
+ssh -i .ssh/team_internal team@team-33-nn # перейти на NameNode (team-33-nn), team; /home/team
+sudo apt install openjdk-11-jdk-headless
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-00 # перейти на DataNode (team-33-00), team; /home/team
+sudo apt install openjdk-11-jdk-headless
+exit # вернуться на edge (team-33-en), team; /home/team
+ssh -i .ssh/team_internal team@team-33-01 # перейти на DataNode (team-33-01), team; /home/team
+sudo apt install openjdk-11-jdk-headless
+exit # вернуться на edge (team-33-en), team; /home/team
+
+# 5. Профиль пользователя hadoop; начало на edge.
+sudo -i -u hadoop # перейти к edge (team-33-en), hadoop; /home/hadoop
+echo "export HADOOP_HOME=/home/hadoop/hadoop-3.4.0" >> .profile
+echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> .profile
+echo 'export PATH="$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin"' >> .profile
+source .profile
+scp .profile team-33-nn:/home/hadoop
+scp .profile team-33-00:/home/hadoop
+scp .profile team-33-01:/home/hadoop
+
+# 6. Подготовка конфигурации на edge под hadoop.
+cd /home/hadoop/hadoop-3.4.0/etc/hadoop
+sed -i '37a JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64' hadoop-env.sh # на всякий случай
+
+cat > core-site.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://team-33-nn:9000</value>
+    </property>
+</configuration>
+EOF
+
+# rpc-address — реальный адрес NameNode для подключения; rpc-bind-host — где слушать RPC.
+# Веб-интерфейс по-прежнему слушает 0.0.0.0:9870, как в исходнике.
+cat > hdfs-site.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>3</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-address</name>
+        <value>team-33-nn:9000</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.http-address</name>
+        <value>0.0.0.0:9870</value>
+    </property>
+</configuration>
+EOF
+
+cat > workers << 'EOF'
+team-33-nn
+team-33-00
+team-33-01
+EOF
+
+scp hadoop-env.sh team-33-nn:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp hadoop-env.sh team-33-00:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp hadoop-env.sh team-33-01:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp core-site.xml team-33-nn:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp core-site.xml team-33-00:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp core-site.xml team-33-01:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp hdfs-site.xml team-33-nn:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp workers team-33-nn:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp workers team-33-00:/home/hadoop/hadoop-3.4.0/etc/hadoop
+scp workers team-33-01:/home/hadoop/hadoop-3.4.0/etc/hadoop
+
+
+# 7. Настройка двух соседних DataNode через NameNode.
+ssh hadoop@team-33-nn # перейти на NameNode (team-33-nn), hadoop; /home/hadoop
+ssh hadoop@team-33-00 # перейти на DataNode (team-33-00), hadoop; /home/hadoop
+cd /home/hadoop/hadoop-3.4.0/etc/hadoop
+# rpc-address — реальный адрес NameNode для подключения; rpc-bind-host — где слушать RPC.
+# Веб-интерфейс по-прежнему слушает 0.0.0.0:9870, как в исходнике.
+cat > hdfs-site.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>3</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-address</name>
+        <value>team-33-nn:9000</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.http-address</name>
+        <value>0.0.0.0:9870</value>
+    </property>
+</configuration>
+EOF
+exit # вернуться на NameNode (team-33-nn), hadoop; /home/hadoop
+
+ssh hadoop@team-33-01 # перейти на DataNode (team-33-01), hadoop; /home/hadoop
+cd /home/hadoop/hadoop-3.4.0/etc/hadoop
+# rpc-address — реальный адрес NameNode для подключения; rpc-bind-host — где слушать RPC.
+# Веб-интерфейс по-прежнему слушает 0.0.0.0:9870, как в исходнике.
+cat > hdfs-site.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property>
+        <name>dfs.replication</name>
+        <value>3</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-address</name>
+        <value>team-33-nn:9000</value>
+    </property>
+    <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.http-address</name>
+        <value>0.0.0.0:9870</value>
+    </property>
+</configuration>
+EOF
+exit # вернуться на NameNode (team-33-nn), hadoop; /home/hadoop
+
+
+# 8. Первичная инициализация и запуск; NameNode, пользователь hadoop.
+cd /home/hadoop/hadoop-3.4.0
+# Однократное форматирование — ТОЛЬКО для нового HDFS без данных.
+# Если HDFS уже был создан, пропустить эту команду; при сомнении не выполнять.
+bin/hdfs namenode -format
+
+# Обычный запуск: форматирование не входит в этот шаг.
+sbin/start-dfs.sh # запуск DFS
+# Обычный перезапуск уже созданного кластера (справка, сейчас не выполнять):
+# Выполнять на team-33-nn под hadoop только три команды ниже.
+# cd /home/hadoop/hadoop-3.4.0
+# sbin/stop-dfs.sh
+# sbin/start-dfs.sh
+
+cd /home/hadoop/hadoop-3.4.0/etc/hadoop
+
+
+# 9. Выход на локальный компьютер и открытие SSH-туннеля к веб-интерфейсу.
+# Проверка:
+exit # вернуться на edge (team-33-en), hadoop; /home/hadoop/hadoop-3.4.0/etc/hadoop
+exit # вернуться на edge (team-33-en), team; /home/team
+exit # вернуться на локальный компьютер, исходный каталог
+ssh -L 9870:10.33.0.11:9870 team@171.22.75.75 # с локального компьютера; туннель через edge
+# Оставить это SSH-подключение открытым на время работы с веб-интерфейсом.
+# На локальном компьютере зайти в браузере на http://localhost:9870.
+# Проверить, что датаноды 3
