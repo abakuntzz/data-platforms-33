@@ -47,12 +47,10 @@ sudo -H -u hadoop /usr/lib/jvm/java-11-openjdk-amd64/bin/jps -l
 
 ## Статус
 
-На ВМ ещё не запускалось. Локальные проверки: `bash tests/test-deploy-hdfs.sh`.
+Локальные проверки: `bash tests/test-deploy-hdfs.sh`.
 Проверяются синтаксис, XML, вызов passwd на четырёх узлах и запреты повторного format; SSH и sudo в тестах заменены заглушками.
 Конфигурация повторяет разобранный вариант: внутренние IP вместо loopback, данные в `/home/hadoop/hdfs-hw01/`, не в `/tmp`.
 `apt upgrade` всей ОС не выполняется. `prepare-node.sh` сначала создаёт пользователя с заблокированным
 паролем, а обёртка сразу задаёт пароль через [passwd](https://manpages.ubuntu.com/manpages/noble/man1/passwd.1.html).
-Пользователь `hadoop` не добавляется в sudo. Это соответствует слайду 5 лекции №4 и созданию пользователя на семинаре 15 сентября (~51:03).
 
-Перед публичной сдачей заменить командные имена / адреса универсальным примером.
 [Документация Hadoop 3.4.0](https://hadoop.apache.org/docs/r3.4.0/hadoop-project-dist/hadoop-common/ClusterSetup.html).
