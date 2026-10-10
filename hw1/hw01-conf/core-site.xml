@@ -1,3 +1,3 @@
 <configuration>
-  <property><name>fs.defaultFS</name><value>hdfs://10.33.0.11:9000</value></property>
+  <property><name>fs.defaultFS</name><value>hdfs://@NAMENODE_IP@:9000</value></property>
 </configuration>
