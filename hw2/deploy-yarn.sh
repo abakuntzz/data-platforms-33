@@ -96,5 +96,12 @@ as_hadoop $HADOOP_DIR/bin/yarn node -list
 [ "\$n" -ge 3 ] || { echo "Зарегистрировалось NodeManager: \$n из 3. Смотрите логи в $HADOOP_DIR/logs" >&2; exit 1; }
 REMOTE
 
-log "Готово: YARN запущен, 3 NodeManager в строю."
+for ((attempt = 0; attempt < 30; attempt++)); do
+    history_code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://$NAMENODE_IP:19888/ws/v1/history/info" || true)
+    [ "$history_code" = 200 ] && break
+    sleep 3
+done
+[ "$history_code" = 200 ] || { echo "History Server не готов: HTTP $history_code. Смотрите логи в $HADOOP_DIR/logs" >&2; exit 1; }
+
+log "Готово: YARN запущен, 3 NodeManager в строю, History Server готов."
 echo "Интерфейсы внутри кластера: ResourceManager http://$NAMENODE_IP:8088, History http://$NAMENODE_IP:19888"

@@ -9,7 +9,7 @@ bash -n deploy-yarn.sh
 bash -n publish-web.sh
 bash -n ../hw1/cluster.conf
 xmllint --noout conf/yarn-site.xml conf/mapred-site.xml
-test "$(grep -c 'proxy_pass http://@' conf/nginx-hadoop.conf)" = 7
+test "$(grep -c 'proxy_pass http://@' conf/nginx-hadoop.conf)" = 10
 echo 'PASS: синтаксис и шаблоны'
 
 test_workspace=$(mktemp -d /tmp/yarn-hw02-tests.XXXXXX)
@@ -43,7 +43,7 @@ check_yarn_configs() {
     for node in edge "$TEST_NN_HOST" "$TEST_DN0_HOST" "$TEST_DN1_HOST"; do
         dir=$TEST_WORK_DIR/nodes/$node
         xmllint --noout "$dir/yarn-site.xml" "$dir/mapred-site.xml"
-        ! grep -q '@[A-Z_0-9]*@' "$dir/yarn-site.xml" "$dir/mapred-site.xml"
+        ! grep -q '@[A-Z_0-9]*@' "$dir/yarn-site.xml" "$dir/mapred-site.xml" || return 1
         test "$(xml_value "$dir/yarn-site.xml" yarn.resourcemanager.hostname)" = "$TEST_NN_IP"
         test "$(xml_value "$dir/yarn-site.xml" yarn.log.server.url)" = "http://$TEST_NN_IP:19888/jobhistory/logs"
         test "$(xml_value "$dir/mapred-site.xml" mapreduce.jobhistory.address)" = "$TEST_NN_IP:10020"
@@ -52,17 +52,18 @@ check_yarn_configs() {
     grep -q "^$TEST_NN_HOST: -n sed -i -E .*/$TEST_NN_IP" "$TEST_WORK_DIR/calls"
     grep -q "^$TEST_DN0_HOST: -n sed -i -E .*/$TEST_DN0_IP" "$TEST_WORK_DIR/calls"
     grep -q "^$TEST_DN1_HOST: -n sed -i -E .*/$TEST_DN1_IP" "$TEST_WORK_DIR/calls"
-    ! grep -q '^edge: -n sed -i' "$TEST_WORK_DIR/calls"
+    ! grep -q '^edge: -n sed -i' "$TEST_WORK_DIR/calls" || return 1
 }
 
 check_nginx_site() {
     local site=$TEST_WORK_DIR/nginx-site
-    ! grep -q '@[A-Z_0-9]*@' "$site"
-    test "$(grep -c 'listen 127.0.0.1:' "$site")" = 7
-    ! grep -E 'listen' "$site" | grep -vq '127.0.0.1'
+    ! grep -q '@[A-Z_0-9]*@' "$site" || return 1
+    test "$(grep -c 'listen 127.0.0.1:' "$site")" = 10 || return 1
+    ! grep -E 'listen' "$site" | grep -vq '127.0.0.1' || return 1
     cmp <(grep -oE 'proxy_pass http://[^;]+' "$site") <(printf 'proxy_pass http://%s\n' \
         "$TEST_NN_IP:9870" "$TEST_NN_IP:8088" "$TEST_NN_IP:19888" "$TEST_NN_IP:9868" \
-        "$TEST_NN_IP:8042" "$TEST_DN0_IP:8042" "$TEST_DN1_IP:8042")
+        "$TEST_NN_IP:8042" "$TEST_DN0_IP:8042" "$TEST_DN1_IP:8042" \
+        "$TEST_NN_IP:9864" "$TEST_DN0_IP:9864" "$TEST_DN1_IP:9864")
 }
 
 configs_written() { ls "$TEST_WORK_DIR"/nodes/*/yarn-site.xml >/dev/null 2>&1; }
@@ -121,8 +122,12 @@ curl() {
         test "$TEST_MODE" != rm_down || return 7
         return 0
     fi
-    [[ $url == http://127.0.0.1:* ]] || { echo "Неожиданный адрес curl: $url" >&2; return 99; }
-    test "$TEST_MODE" != port_down || [[ $url != *:8043/ ]] || code=502
+    if [[ $url == "http://$TEST_NN_IP:19888/ws/v1/history/info" ]]; then
+        test "$TEST_MODE" != history_down || code=503
+    else
+        [[ $url == http://127.0.0.1:* ]] || { echo "Неожиданный адрес curl: $url" >&2; return 99; }
+        test "$TEST_MODE" != port_down || [[ $url != *:8043/ ]] || code=502
+    fi
     echo "$code"
 }
 nginx() { echo 'nginx version: nginx/1.24.0 (mock)'; }
@@ -142,7 +147,7 @@ for TEST_MODE in wrong_user missing_hadoop namenode_down hosts_loopback; do
     if output=$(bash deploy-yarn.sh 2>&1); then
         echo "Неожиданный успех: $TEST_MODE" >&2; exit 1
     fi
-    ! configs_written
+    ! configs_written || exit 1
     [[ $output != *MOCK_START_YARN* ]]
     echo "PASS: deploy-yarn.sh останавливается при $TEST_MODE до записи конфигов"
 done
@@ -152,15 +157,26 @@ if output=$(bash deploy-yarn.sh 2>&1); then echo 'Неожиданный усп�
 [[ $output == *MOCK_START_YARN* && $output == *'Зарегистрировалось NodeManager: 2 из 3'* && $output != *'Готово:'* ]]
 echo 'PASS: deploy-yarn.sh — ненулевой код, если зарегистрировались не все NodeManager'
 
+reset_state; TEST_MODE=history_down
+if output=$(bash deploy-yarn.sh 2>&1); then echo 'Неожиданный успех: history_down' >&2; exit 1; fi
+[[ $output == *MOCK_START_HISTORY* && $output == *'History Server не готов: HTTP 503'* && $output != *'Готово:'* ]]
+echo 'PASS: deploy-yarn.sh — ненулевой код, если History Server не готов'
+
 reset_state; TEST_MODE=fresh
 output=$(bash publish-web.sh)
 [[ $output == *MOCK_NGINX_TEST* && $output == *MOCK_NGINX_RELOAD* ]]
 check_nginx_site
 tunnel=$(grep -E '^  ssh -N ' <<< "$output")
-[[ $tunnel == *" $TEST_SSH_USER@$TEST_EDGE_HOST" ]]
-test "$(grep -o -- '-L [0-9]*:localhost:[0-9]*' <<< "$tunnel" | grep -c .)" = 7
-echo 'PASS: publish-web.sh — конфиг nginx: 7 демонов, только localhost, адреса из cluster.conf'
-echo 'PASS: publish-web.sh — команда туннеля на edge из cluster.conf'
+[[ $output == *'source hw1/cluster.conf'* ]]
+[[ $tunnel == *"-i \"\$EDGE_SSH_KEY\""* && $tunnel == *"\"\$SSH_USER@\$EDGE_HOST\"" ]]
+test "$(grep -o -- '-L [0-9]*:localhost:[0-9]*' <<< "$tunnel" | grep -c .)" = 10
+echo 'PASS: publish-web.sh — конфиг nginx: 10 демонов, только localhost, адреса из cluster.conf'
+echo 'PASS: publish-web.sh — команда туннеля использует локальные EDGE_SSH_KEY, SSH_USER и EDGE_HOST'
+cp "$TEST_WORK_DIR/nginx-site" "$TEST_WORK_DIR/nginx-site.valid"
+printf '\nserver { listen 0.0.0.0:9871; }\n' >> "$TEST_WORK_DIR/nginx-site"
+if check_nginx_site; then echo 'Не обнаружен публичный listener' >&2; exit 1; fi
+mv "$TEST_WORK_DIR/nginx-site.valid" "$TEST_WORK_DIR/nginx-site"
+echo 'PASS: проверка nginx отклоняет публичный listener'
 
 for TEST_MODE in wrong_user rm_down; do
     reset_state
@@ -204,7 +220,7 @@ check_yarn_configs
 reset_state
 output=$(bash publish-web.sh)
 check_nginx_site
-[[ $output == *" student@198.51.100.42"* ]]
+[[ $output == *"-i \"\$EDGE_SSH_KEY\""* && $output == *"\"\$SSH_USER@\$EDGE_HOST\""* ]]
 echo 'PASS: другая подсеть, имена узлов, SSH-пользователь и путь ключа с пробелами'
 cd "$WORK_DIR"
 test "$(sha256sum conf/*)" = "$template_fingerprint"

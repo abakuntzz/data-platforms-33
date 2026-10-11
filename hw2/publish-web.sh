@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONF=conf/nginx-hadoop.conf
-PORTS="9870 8088 19888 9868 8042 8043 8044"
+PORTS="9870 8088 19888 9868 8042 8043 8044 9864 9865 9866"
 
 cd "$(dirname "$0")"
 test -f ../hw1/cluster.conf || { echo "Нет ../hw1/cluster.conf: запускайте из репозитория (hw1 и hw2 рядом)" >&2; exit 1; }
@@ -10,8 +10,11 @@ source ../hw1/cluster.conf
 
 render() {
     sed -e "s/@NAMENODE_IP@/$NAMENODE_IP/g" \
+        -e "s/@NAMENODE_HOST@/$NAMENODE_HOST/g" \
         -e "s/@DATANODE_0_IP@/$DATANODE_0_IP/g" \
-        -e "s/@DATANODE_1_IP@/$DATANODE_1_IP/g" "$1"
+        -e "s/@DATANODE_0_HOST@/$DATANODE_0_HOST/g" \
+        -e "s/@DATANODE_1_IP@/$DATANODE_1_IP/g" \
+        -e "s/@DATANODE_1_HOST@/$DATANODE_1_HOST/g" "$1"
 }
 log() { echo; echo "=== $*"; }
 
@@ -45,11 +48,13 @@ for p in $PORTS; do
     case "$code" in 2??|3??) ;; *) echo "Порт $p не отвечает, проверьте sudo nginx -T и что демон запущен" >&2; exit 1 ;; esac
 done
 
-log "Готово. На своём компьютере откройте туннель:"
-echo "  ssh -N $(for p in $PORTS; do printf -- '-L %s:localhost:%s ' "$p" "$p"; done)$SSH_USER@$EDGE_HOST"
+log "Готово. На своём компьютере из корня репозитория откройте туннель:"
+echo "  source hw1/cluster.conf"
+echo "  ssh -N -i \"\$EDGE_SSH_KEY\" $(for p in $PORTS; do printf -- '-L %s:localhost:%s ' "$p" "$p"; done)\"\$SSH_USER@\$EDGE_HOST\""
 echo "и зайдите в браузере:"
 echo "  NameNode         http://localhost:9870"
 echo "  ResourceManager  http://localhost:8088"
 echo "  JobHistory       http://localhost:19888"
 echo "  SecondaryNN      http://localhost:9868"
 echo "  NodeManager      http://localhost:8042  :8043  :8044  (nn, 00, 01)"
+echo "  DataNode         http://localhost:9864  :9865  :9866  (nn, 00, 01)"
