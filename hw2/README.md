@@ -20,7 +20,7 @@ bash publish-web.sh
 
 `deploy-yarn.sh` проверяет, что NameNode запущен, прописывает в `/etc/hosts` внутренние IP узлов
 вместо `127.0.1.1`, раскладывает конфиги на четыре VM и перезапускает YARN и History Server.
-Завершается успешно, только если зарегистрировались три NodeManager. Исходные файлы сохраняются
+Завершается успешно, только если зарегистрировались три NodeManager и отвечает API History Server. Исходные файлы сохраняются
 как `*.bak-hw2`. Повторный запуск безопасен, HDFS не затрагивается.
 
 Каждый NodeManager отдаёт YARN 1024 МБ и 2 vcores, контейнеры MapReduce получают по 512 МБ:
@@ -28,9 +28,12 @@ bash publish-web.sh
 
 `publish-web.sh` ставит nginx и включает конфиг, по которому localhost edge проксируется на демоны:
 NameNode (9870), ResourceManager (8088), JobHistory (19888), SecondaryNameNode (9868),
-NodeManager (8042, 8043, 8044). Внешние порты VM закрыты, поэтому доступ — через SSH-туннель.
+NodeManager (8042, 8043, 8044), DataNode (9864, 9865, 9866). Порты NodeManager и DataNode перечислены
+в порядке NN, DataNode-0, DataNode-1. nginx слушает только localhost edge; доступ — через SSH-туннель.
+Внутренние адреса в ссылках, JSON и HTTP-редиректах заменяются на соответствующие адреса localhost.
 
-**`hw1/deploy-hdfs.sh` на работающем кластере не запускать**: он переустанавливает Hadoop и форматирует HDFS.
+**`hw1/deploy-hdfs.sh` предназначен для первичного развёртывания**: при существующей установке он завершится до изменений.
+Для запуска существующего HDFS используйте `hw1/hadoop-guide.txt`, без форматирования.
 
 ## Проверка
 
@@ -40,10 +43,12 @@ NodeManager (8042, 8043, 8044). Внешние порты VM закрыты, п�
 source hw1/cluster.conf
 ssh -N -i "$EDGE_SSH_KEY" -L 9870:localhost:9870 -L 8088:localhost:8088 -L 19888:localhost:19888 \
     -L 9868:localhost:9868 -L 8042:localhost:8042 -L 8043:localhost:8043 -L 8044:localhost:8044 \
+    -L 9864:localhost:9864 -L 9865:localhost:9865 -L 9866:localhost:9866 \
     "$SSH_USER@$EDGE_HOST"
 ```
 
 В `http://localhost:8088` → Nodes должно быть три узла `RUNNING`, в `http://localhost:9870` — три live DataNode.
+Переходы к NodeManager и DataNode должны открывать соответствующие страницы localhost.
 Тестовая задача (на NN под `SSH_USER`):
 
 ```bash
