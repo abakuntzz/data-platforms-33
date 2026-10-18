@@ -86,6 +86,36 @@ sha256sum() {
 scp() {
     echo "scp $*" >> "$TEST_WORK_DIR/calls"
     test "$TEST_MODE" != scp_fail || return 1
+    _scp_dest=
+    _scp_src=
+    _scp_skip_next=0
+    for _scp_opt in "$@"; do
+        if [ "$_scp_skip_next" = 1 ]; then
+            _scp_skip_next=0
+            continue
+        fi
+        case "$_scp_opt" in
+            -i|-P|-F) _scp_skip_next=1; continue ;;
+            -o|-o*) continue ;;
+            *@*:*)
+                _scp_dest=$_scp_opt
+                ;;
+            *)
+                if [ -f "$_scp_opt" ]; then
+                    _scp_src=$_scp_opt
+                fi
+                ;;
+        esac
+    done
+    if [[ "$_scp_dest" == *:* ]]; then
+        _scp_rpath=${_scp_dest#*:}
+        mkdir -p "$(dirname "$(nn_path "$_scp_rpath")")"
+        cp -f "$_scp_src" "$(nn_path "$_scp_rpath")"
+        if [[ "$_scp_rpath" == /tmp/* ]]; then
+            mkdir -p "$(dirname "$_scp_rpath")"
+            cp -f "$_scp_src" "$_scp_rpath"
+        fi
+    fi
     return 0
 }
 nn_path() { echo "$TEST_WORK_DIR/nn$1"; }
@@ -113,6 +143,25 @@ sudo() {
             mkdir -p "$(nn_path /home/hadoop/apache-hive-4.0.0-alpha-2-bin/bin)"
             printf '%s\n' '#!/usr/bin/env bash' 'echo schematool >> "'"$TEST_WORK_DIR"'/calls"' > "$(nn_path /home/hadoop/apache-hive-4.0.0-alpha-2-bin/bin/schematool)"
             chmod +x "$(nn_path /home/hadoop/apache-hive-4.0.0-alpha-2-bin/bin/schematool)"
+            return 0
+        fi
+        if [ "$1" = mv ]; then
+            local src=$2 dst=$3
+            [[ "$dst" == /home/hadoop/* ]] && dst=$(nn_path "$dst")
+            mkdir -p "$(dirname "$dst")"
+            command mv "$src" "$dst"
+            return 0
+        fi
+        if [ "$1" = rm ]; then
+            shift
+            local path
+            for path in "$@"; do
+                case "$path" in
+                    -*) continue ;;
+                    /home/hadoop/*) command rm -f "$(nn_path "$path")" ;;
+                    *) command rm -f "$path" ;;
+                esac
+            done
             return 0
         fi
         "$@"
@@ -149,7 +198,15 @@ ssh() {
     echo "ssh $*" >> "$TEST_WORK_DIR/calls"
     test "$TEST_MODE" != ssh_fail || return 255
     TEST_CURRENT_NODE=$TEST_NN_HOST
-    if [ "$4" = 'bash' ] && [ "$5" = '-se' ]; then
+    _ssh_prev=
+    _ssh_bash_se=0
+    for _ssh_arg in "$@"; do
+        if [ "$_ssh_prev" = bash ] && [ "$_ssh_arg" = -se ]; then
+            _ssh_bash_se=1
+        fi
+        _ssh_prev=$_ssh_arg
+    done
+    if [ "$_ssh_bash_se" = 1 ]; then
         bash -se
     else
         command=${!#}

@@ -75,8 +75,8 @@ set -euo pipefail
 as_hadoop() { sudo -n -H -u hadoop "\$@"; }
 export HADOOP_HOME=$HADOOP_DIR HIVE_HOME=$HIVE_DIR
 export PATH="\$HADOOP_HOME/bin:\$HIVE_HOME/bin:\$PATH"
-as_hadoop hdfs dfs -mkdir -p /tmp /user/hive/warehouse /input/hw03 || true
-as_hadoop hdfs dfs -chmod g+w /tmp /user/hive/warehouse || true
+as_hadoop $HADOOP_DIR/bin/hdfs dfs -mkdir -p /tmp /user/hive/warehouse /input/hw03 || true
+as_hadoop $HADOOP_DIR/bin/hdfs dfs -chmod g+w /tmp /user/hive/warehouse || true
 if as_hadoop test ! -d $HIVE_METASTORE/metastore_db; then
     as_hadoop $HIVE_DIR/bin/schematool -dbType derby -initSchema
 else

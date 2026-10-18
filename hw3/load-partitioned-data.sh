@@ -52,8 +52,8 @@ for part in red blue; do
     run_on_nn "bash -se" <<REMOTE
 set -euo pipefail
 sudo -n -H -u hadoop bash -c '
-    hdfs dfs -mkdir -p $HDFS_INPUT/$part
-    hdfs dfs -put -f /tmp/hw03-$part-data.tsv $HDFS_INPUT/$part/data.tsv
+    $HADOOP_DIR/bin/hdfs dfs -mkdir -p $HDFS_INPUT/$part
+    $HADOOP_DIR/bin/hdfs dfs -put -f /tmp/hw03-$part-data.tsv $HDFS_INPUT/$part/data.tsv
 '
 rm -f /tmp/hw03-$part-data.tsv
 REMOTE
