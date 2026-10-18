@@ -1,0 +1,20 @@
+# из папки /home/hadoop/hadoop:
+wget https://archive.apache.org/dist/hive/hive-4.0.0-alpha-2/apache-hive-4.0.0-alpha-2-bin.tar.gz
+tar -zxvf apache-hive-4.0.0-alpha-2-bin.tar.gz
+cd apache-hive-4.0.0-alpha-2-bin
+export HIVE_HOME=/home/hadoop/hadoop/apache-hive-4.0.0-alpha-2-bin
+export PATH=$PATH:$HIVE_HOME/bin
+hdfs dfs -mkdir /tmp
+hdfs dfs -mkdir -p /user/hive/warehouse
+hdfs dfs -chmod g+w /tmp
+hdfs dfs -chmod g+w /user/hive/warehouse
+bin/schematool -dbType derby -initSchema
+# запуск
+hive --hiveconf hive.server2.enable.doAs=false --hiveconf hive.security.authorization.enabled=false --service hiveserver2 1>> /tmp/hs2.log 2>> /tmp/hs2.log &
+beeline -u jdbc:hive2://localhost:10000 -n scott -p tiger
+CREATE DATABASE test;
+CREATE TABLE IF NOT EXISTS test.colours ( colour string, number int ) COMMENT 'colours table' ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t';
+USE test;
+LOAD DATA INPATH '/input/colours.tsv' INTO TABLE test.colours; # надо заранее создать такой файлик через команду hdfs dfs
+!q
+kill -9 $(pgrep -f org.apache.hive.service.server.HiveServer2)
