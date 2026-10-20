@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <configuration>
+  <!-- HiveServer2 обращается к отдельному Metastore по Thrift, а не к Derby. -->
+  <property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://@METASTORE_HOST@:@METASTORE_PORT@</value>
+  </property>
   <property>
     <name>hive.metastore.warehouse.dir</name>
     <value>hdfs://@NAMENODE_IP@:9000/user/hive/warehouse</value>
-  </property>
-  <property>
-    <name>javax.jdo.option.ConnectionURL</name>
-    <value>jdbc:derby:;databaseName=/home/hadoop/hive-hw03/metastore_db;create=true</value>
-  </property>
-  <property>
-    <name>javax.jdo.option.ConnectionDriverName</name>
-    <value>org.apache.derby.jdbc.EmbeddedDriver</value>
   </property>
   <property>
     <name>hive.server2.thrift.port</name>
