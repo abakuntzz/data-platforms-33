@@ -210,30 +210,16 @@ fi
 # 1a. ПРОВЕРКИ ОКРУЖЕНИЯ НА DATANODE
 # ─────────────────────────────────────────────────────────
 
-log "1a. Проверки окружения Hadoop на DataNode"
+log "1a. Проверки DataNode"
 
 for host in "${DATANODE_HOSTS[@]}"; do
     echo "  → $host"
-
-    if ! run_on_dn "$host" "sudo -n grep -q 'HADOOP_HOME' /home/hadoop/.profile"; then
-        die "На $host в /home/hadoop/.profile нет HADOOP_HOME. \
-Допишите:
-  export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-  export HADOOP_HOME=$HADOOP_DIR
-  export HADOOP_CONF_DIR=\\\$HADOOP_HOME/etc/hadoop
-  export PATH=\\\$PATH:\\\$JAVA_HOME/bin:\\\$HADOOP_HOME/bin:\\\$HADOOP_HOME/sbin"
-    fi
-
-    if ! run_on_dn "$host" "sudo -n -u hadoop bash -lc 'command -v hdfs' >/dev/null 2>&1"; then
-        die "На $host команда 'hdfs' не находится в PATH. \
-Проверьте: sudo -u hadoop bash -lc 'which hdfs'"
-    fi
 
     if ! run_on_dn "$host" "sudo -n -u hadoop $JPS | grep -qw DataNode"; then
         die "На $host не запущен DataNode. Запустите: ssh $NN '$HADOOP_DIR/sbin/start-dfs.sh'"
     fi
 
-    echo "    ✔ .profile, PATH, DataNode — ок"
+    echo "    ✔ DataNode запущен"
 done
 
 # ─────────────────────────────────────────────────────────
@@ -552,11 +538,13 @@ echo "  Metastore:  ${METASTORE_URI} (отдельный процесс на $NN
 echo "  Пользователь: ${BEELINE_USER}${BEELINE_PASS:+ (пароль задан)}"
 echo ""
 echo "  Web UI: http://localhost:10002"
-echo "    ssh -L 10002:${NAMENODE_IP}:10002 ${SSH_USER}@${NN}"
+echo "    На компьютере, из корня репозитория:"
+echo "    source hw1/cluster.conf"
+echo '    ssh -N -o ExitOnForwardFailure=yes -i "$EDGE_SSH_KEY" -L "127.0.0.1:10002:$NAMENODE_IP:10002" "$SSH_USER@$EDGE_HOST"'
 echo ""
 echo "  Партиционированная таблица: ${COLOURS_TABLE}"
 echo "  Партиции: colour=<значение>"
-echo "  Данные:   ${COLOURS_HDFS}"
+echo "  Входной файл HDFS до LOAD DATA: ${COLOURS_HDFS}"
 echo ""
 echo "  Подключение:"
 echo "    beeline -u \"${BEELINE_JDBC}\" -n ${BEELINE_USER}${BEELINE_PASS:+ -p ****}"
