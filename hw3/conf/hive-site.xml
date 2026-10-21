@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <!-- HiveServer2 обращается к отдельному Metastore по Thrift, а не к Derby. -->
+  <property>
+    <name>hive.metastore.uris</name>
+    <value>thrift://@METASTORE_HOST@:@METASTORE_PORT@</value>
+  </property>
+  <property>
+    <name>hive.metastore.warehouse.dir</name>
+    <value>hdfs://@NAMENODE_IP@:9000/user/hive/warehouse</value>
+  </property>
+  <property>
+    <name>hive.server2.thrift.port</name>
+    <value>10000</value>
+  </property>
+  <property>
+    <name>hive.server2.thrift.bind.host</name>
+    <value>@NAMENODE_IP@</value>
+  </property>
+  <property>
+    <name>hive.server2.enable.doAs</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.security.authorization.enabled</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.execution.engine</name>
+    <value>mr</value>
+  </property>
+    <property>
+    <name>hive.server2.webui.host</name>
+    <value>0.0.0.0</value>
+  </property>
+  <property>
+    <name>hive.server2.webui.port</name>
+    <value>10002</value>
+    </property>
+</configuration>

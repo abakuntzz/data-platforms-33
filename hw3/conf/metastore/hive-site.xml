@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <!-- Только этот процесс открывает Derby; HiveServer2 использует Thrift. -->
+  <property>
+    <name>metastore.thrift.bind.host</name>
+    <value>@METASTORE_HOST@</value>
+  </property>
+  <property>
+    <name>metastore.thrift.port</name>
+    <value>@METASTORE_PORT@</value>
+  </property>
+  <property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:derby:;databaseName=@HIVE_METASTORE@/metastore_db;create=true</value>
+  </property>
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>org.apache.derby.jdbc.EmbeddedDriver</value>
+  </property>
+  <property>
+    <name>metastore.warehouse.dir</name>
+    <value>hdfs://@NAMENODE_IP@:9000/user/hive/warehouse</value>
+  </property>
+  <property>
+    <name>metastore.schema.verification</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>datanucleus.schema.autoCreateAll</name>
+    <value>false</value>
+  </property>
+  <!-- Разрешаем API уведомлений для локального учебного Metastore. -->
+  <property>
+    <name>hive.metastore.event.db.notification.api.auth</name>
+    <value>false</value>
+  </property>
+</configuration>

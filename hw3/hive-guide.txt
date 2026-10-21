@@ -1,0 +1,19 @@
+# После deploy-hive.sh. На edge, из каталога hw3:
+source ../hw1/cluster.conf
+ssh -t -i "$SSH_KEY" "$SSH_USER@$NAMENODE_HOST" \
+  "sudo -n -u hadoop bash -lc '
+    source /home/hadoop/apache-hive-4.0.0-alpha-2-bin/conf/hive-env.sh
+    export HIVE_CONF_DIR=\$HIVE_HOME/conf
+    beeline -u jdbc:hive2://${NAMENODE_IP}:10000 -n hadoop
+  '"
+
+# Для двух клиентов повторите подключение во втором терминале, оставив первое открытым.
+# В Beeline, в обоих терминалах:
+SET hive.metastore.uris;
+SELECT COUNT(*) FROM test.colours;
+SELECT colour, number FROM test.colours ORDER BY colour;
+SHOW PARTITIONS test.colours;
+!q
+
+# Ожидается: адрес Metastore из cluster.conf, 10 строк, 10 партиций colour=<цвет>.
+# Логи на NameNode: /tmp/hive-hw03-metastore.log и /tmp/hive-hw03-hs2.log.
