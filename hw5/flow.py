@@ -120,8 +120,8 @@ def check_with_hive(table, columns, expected_rows):
 
     logger.info("Ответ Beeline:\n%s", result.stdout)
 
-    actual = {tuple(line.split("\t")) for line in result.stdout.splitlines() if line.strip()}
-    if actual != set(expected_rows):
+    actual = [tuple(line.split("\t")) for line in result.stdout.splitlines() if line.strip()]
+    if sorted(actual) != sorted(expected_rows):
         raise ValueError(f"Hive вернул {sorted(actual)},\nа Spark записал {sorted(expected_rows)}")
     logger.info("Hive читает таблицу %s, данные совпадают со Spark", table)
 
