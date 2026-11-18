@@ -6,7 +6,7 @@ source ./hw5-env.sh
 LOG=$HW5_HOME/prefect-server.log
 PID_FILE=$HW5_HOME/prefect-server.pid
 
-if curl -s "$PREFECT_API_URL/health" > /dev/null; then
+if curl -fs --connect-timeout 2 --max-time 5 "$PREFECT_API_URL/health" > /dev/null; then
     echo "Сервер Prefect уже запущен: $PREFECT_API_URL"
     exit 0
 fi
@@ -15,8 +15,9 @@ nohup prefect server start > "$LOG" 2>&1 &
 echo $! > "$PID_FILE"
 
 
-for i in $(seq 1 60); do
-    if curl -s "$PREFECT_API_URL/health" > /dev/null; then
+startup_deadline=$((SECONDS + 120))
+while [ "$SECONDS" -lt "$startup_deadline" ]; do
+    if curl -fs --connect-timeout 2 --max-time 5 "$PREFECT_API_URL/health" > /dev/null; then
         echo "Сервер Prefect запущен: http://$PREFECT_SERVER_API_HOST:$PREFECT_SERVER_API_PORT"
         exit 0
     fi
